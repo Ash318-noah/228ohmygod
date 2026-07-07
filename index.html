@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1947: 記憶的微光</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Serif TC', serif;
+            background-color: #1a1814;
+            color: #e5d9c5;
+            margin: 0;
+            overflow: hidden;
+            /* 模擬老照片的雜訊效果 */
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+        }
+
+        .vintage-shadow {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), inset 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .paper-texture {
+            background-color: #d8cba9;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.15'/%3E%3C/svg%3E");
+            color: #3b3327;
+        }
+
+        .fade-in {
+            animation: fadeIn 1.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 收音機雜訊動畫 */
+        .static-noise {
+            background: linear-gradient(transparent, rgba(255,255,255,0.1) 2px, transparent 2px);
+            background-size: 100% 4px;
+            animation: scanlines 1s linear infinite;
+        }
+
+        @keyframes scanlines {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // 小遊戲 1：密碼鎖
+        const LockGame = ({ onSolve }) => {
+            const [digits, setDigits] = useState([0, 0, 0, 0]);
+            
+            const changeDigit = (index, delta) => {
+                const newDigits = [...digits];
+                let newVal = newDigits[index] + delta;
+                if (newVal > 9) newVal = 0;
+                if (newVal < 0) newVal = 9;
+                newDigits[index] = newVal;
+                setDigits(newDigits);
+                
+                if (newDigits.join('') === '0228') {
+                    setTimeout(onSolve, 1000);
+                }
+            };
+
+            return (
+                <div className="flex flex-col items-center justify-center space-y-8 fade-in">
+                    <div className="text-center space-y-4 max-w-md">
+                        <p className="text-lg leading-relaxed text-stone-300">
+                            在祖父的床底，我找到了一個沈甸甸的紅木盒。<br/>
+                            鎖頭上積滿了灰塵。盒子底部貼著一張泛黃的字條，上面只寫著：
+                        </p>
+                        <p className="text-xl italic text-amber-200/80">「那是一個無法忘記的春日... 一切的起點。」</p>
+                    </div>
+
+                    <div className="bg-stone-800 p-8 rounded-lg vintage-shadow border border-stone-700">
+                        <div className="flex space-x-4">
+                            {digits.map((digit, idx) => (
+                                <div key={idx} className="flex flex-col items-center">
+                                    <button onClick={() => changeDigit(idx, 1)} className="text-stone-500 hover:text-amber-200 text-3xl pb-2 transition-colors">▲</button>
+                                    <div className="w-16 h-20 bg-stone-900 border-2 border-stone-600 flex items-center justify-center text-4xl text-amber-100 rounded shadow-inner">
+                                        {digit}
+                                    </div>
+                                    <button onClick={() => changeDigit(idx, -1)} className="text-stone-500 hover:text-amber-200 text-3xl pt-2 transition-colors">▼</button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    {digits.join('') === '0228' && (
+                        <p className="text-green-400/80 tracking-widest animate-pulse">喀噠。鎖開了。</p>
+                    )}
+                </div>
+            );
+        };
+
+        // 小遊戲 2：收音機
+        const RadioGame = ({ onSolve }) => {
+            const [freq, setFreq] = useState(88.0);
+            const targetFreq = 94.7;
+            const [isSolved, setIsSolved] = useState(false);
+
+            const distance = Math.abs(freq - targetFreq);
+            // 當距離很近時，雜音減少，文字顯現
+            const clarity = Math.max(0, 1 - (distance / 2)); 
+            const noiseOpacity = Math.min(1, distance / 3);
+
+            useEffect(() => {
+                if (distance < 0.2 && !isSolved) {
+                    setIsSolved(true);
+                    setTimeout(onSolve, 5000); // 5秒後進入下一關
+                }
+            }, [freq, distance, isSolved, onSolve]);
+
+            return (
+                <div className="flex flex-col items-center justify-center space-y-8 fade-in w-full max-w-2xl mx-auto px-4">
+                    <div className="text-center space-y-4">
+                        <p className="text-lg leading-relaxed text-stone-300">
+                            盒子裡裝著一台斑駁的真空管收音機，還有一張背面寫著<br/>
+                            <span className="text-amber-200">「請記住 1947 年的聲音」</span>的舊名片。
+                        </p>
+                    </div>
+
+                    <div className="w-full bg-stone-800 p-8 rounded-xl vintage-shadow border-4 border-stone-900 relative overflow-hidden">
+                        {/* 螢幕 */}
+                        <div className="w-full h-40 bg-stone-900 rounded border-2 border-stone-700 mb-8 relative flex items-center justify-center overflow-hidden">
+                            {/* 雜訊層 */}
+                            <div className="absolute inset-0 static-noise pointer-events-none" style={{ opacity: noiseOpacity }}></div>
+                            
+                            {/* 廣播內容 */}
+                            <div className="text-center px-6 transition-opacity duration-500" style={{ opacity: clarity, filter: `blur(${distance * 2}px)` }}>
+                                <p className="text-amber-100 text-lg md:text-xl font-bold tracking-wider leading-relaxed">
+                                    「這裡是台灣廣播電台... 請各位同胞保持冷靜...<br/>
+                                    我們已經成立了處理委員會...」
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* 頻率顯示 */}
+                        <div className="text-center mb-4">
+                            <span className="text-red-500 text-3xl font-mono tracking-widest">{freq.toFixed(1)}</span>
+                            <span className="text-stone-500 ml-2">MHz</span>
+                        </div>
+
+                        {/* 調頻旋鈕 (使用滑桿模擬) */}
+                        <input 
+                            type="range" 
+                            min="88.0" 
+                            max="108.0" 
+                            step="0.1" 
+                            value={freq}
+                            onChange={(e) => setFreq(parseFloat(e.target.value))}
+                            className="w-full h-4 bg-stone-900 rounded-lg appearance-none cursor-pointer outline-none"
+                            style={{
+                                accentColor: '#ef4444'
+                            }}
+                            disabled={isSolved}
+                        />
+                        <div className="flex justify-between text-stone-500 text-sm mt-2 font-mono">
+                            <span>88.0</span>
+                            <span>98.0</span>
+                            <span>108.0</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 小遊戲 3：拼湊日記
+        const DocumentGame = ({ onSolve }) => {
+            // 正確順序的文字
+            const correctOrder = [
+                "三月八日，軍隊開入了市區。",
+                "街上傳來密集的槍聲，我們只能躲在防空壕裡。",
+                "鄰居阿火伯被帶走後，就再也沒有回來。",
+                "我把這段記憶藏起，祈禱未來的台灣能迎來真正的天明。"
+            ];
+
+            // 初始打亂的順序與索引
+            const [pieces, setPieces] = useState([
+                { id: 2, text: "鄰居阿火伯被帶走後，就再也沒有回來。" },
+                { id: 0, text: "三月八日，軍隊開入了市區。" },
+                { id: 3, text: "我把這段記憶藏起，祈禱未來的台灣能迎來真正的天明。" },
+                { id: 1, text: "街上傳來密集的槍聲，我們只能躲在防空壕裡。" }
+            ]);
+
+            const [selectedIdx, setSelectedIdx] = useState(null);
+
+            const handlePieceClick = (index) => {
+                if (selectedIdx === null) {
+                    setSelectedIdx(index);
+                } else {
+                    // 交換位置
+                    const newPieces = [...pieces];
+                    const temp = newPieces[selectedIdx];
+                    newPieces[selectedIdx] = newPieces[index];
+                    newPieces[index] = temp;
+                    setPieces(newPieces);
+                    setSelectedIdx(null);
+                    checkWin(newPieces);
+                }
+            };
+
+            const checkWin = (currentPieces) => {
+                const isWin = currentPieces.every((p, idx) => p.id === idx);
+                if (isWin) {
+                    setTimeout(onSolve, 2000);
+                }
+            };
+
+            return (
+                <div className="flex flex-col items-center justify-center space-y-8 fade-in w-full max-w-lg mx-auto px-4">
+                    <div className="text-center space-y-4">
+                        <p className="text-lg leading-relaxed text-stone-300">
+                            收音機的底部夾著一張被撕碎的日記頁。<br/>
+                            <span className="text-amber-200 text-sm">（點擊兩片紙張以交換位置，拼湊出完整的記憶）</span>
+                        </p>
+                    </div>
+
+                    <div className="w-full space-y-3">
+                        {pieces.map((piece, idx) => (
+                            <div 
+                                key={piece.id}
+                                onClick={() => handlePieceClick(idx)}
+                                className={`
+                                    paper-texture p-4 rounded cursor-pointer transition-all duration-300
+                                    ${selectedIdx === idx ? 'ring-2 ring-blue-500 scale-105 shadow-xl' : 'shadow-md hover:shadow-lg'}
+                                    ${pieces.every((p, i) => p.id === i) ? 'opacity-90 pointer-events-none' : ''}
+                                `}
+                                style={{ transform: selectedIdx !== idx ? `rotate(${Math.random() * 2 - 1}deg)` : 'none' }}
+                            >
+                                <p className="text-lg font-medium leading-loose tracking-wide">{piece.text}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {pieces.every((p, idx) => p.id === idx) && (
+                        <p className="text-green-400/80 tracking-widest animate-pulse mt-4">記憶已完整。</p>
+                    )}
+                </div>
+            );
+        };
+
+        // 小遊戲 4：安全路線
+        const MapGame = ({ onSolve }) => {
+            const locations = [
+                "台北驛", "鐵橋", "總督府", 
+                "大稻埕碼頭", "醫院", "公會堂"
+            ];
+            const correctOrder = ["鐵橋", "醫院", "大稻埕碼頭"];
+            const [selected, setSelected] = useState([]);
+            const [error, setError] = useState(false);
+
+            const handleSelect = (loc) => {
+                if (selected.includes(loc)) return;
+                
+                const newSelected = [...selected, loc];
+                setSelected(newSelected);
+                setError(false);
+
+                if (newSelected.length === 3) {
+                    if (newSelected.join(',') === correctOrder.join(',')) {
+                        setTimeout(onSolve, 2000);
+                    } else {
+                        setTimeout(() => {
+                            setSelected([]);
+                            setError(true);
+                        }, 800);
+                    }
+                }
+            };
+
+            return (
+                <div className="flex flex-col items-center justify-center space-y-8 fade-in w-full max-w-2xl mx-auto px-4">
+                    <div className="text-center space-y-4">
+                        <p className="text-lg leading-relaxed text-stone-300">
+                            日記裡夾著一張手繪地圖，背後寫著撤退的暗語：<br/>
+                            <span className="text-amber-200">「入夜後避開大馬路。先在『鐵橋』下等待，確認安全後前往『醫院』後門，最後在『大稻埕碼頭』會合離開。」</span>
+                        </p>
+                        <p className="text-sm text-stone-500">（請依照暗語順序點擊正確的地點）</p>
+                    </div>
+
+                    <div className="bg-stone-800 p-8 rounded-lg vintage-shadow border border-stone-700 w-full">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {locations.map(loc => (
+                                <button
+                                    key={loc}
+                                    onClick={() => handleSelect(loc)}
+                                    className={`p-4 rounded border transition-all duration-300 ${
+                                        selected.includes(loc) 
+                                            ? 'bg-amber-900/50 border-amber-500 text-amber-200' 
+                                            : 'bg-stone-900 border-stone-600 text-stone-400 hover:border-amber-700 hover:text-stone-200'
+                                    }`}
+                                >
+                                    {loc}
+                                    {selected.includes(loc) && <span className="ml-2 text-xs opacity-75">{selected.indexOf(loc) + 1}</span>}
+                                </button>
+                            ))}
+                        </div>
+                        {error && <p className="text-red-400 mt-4 text-center animate-pulse">路線錯誤，有遭遇巡邏的風險，請重新規劃。</p>}
+                        {selected.length === 3 && !error && <p className="text-green-400 mt-4 text-center animate-pulse">路線規劃正確，準備移動。</p>}
+                    </div>
+                </div>
+            );
+        };
+
+        // 小遊戲 5：密碼信
+        const CipherGame = ({ onSolve }) => {
+            const lines = [
+                "願 望 總 在 黑 夜 中",
+                "平 凡 日 常 是 奢 求",
+                "安 息 吧 受 難 靈 魂"
+            ];
+            const target = ["願", "平", "安"];
+            const [selectedChars, setSelectedChars] = useState([]);
+
+            const handleCharClick = (char) => {
+                if (char === " ") return;
+                
+                let newSelected;
+                if (selectedChars.includes(char)) {
+                    newSelected = selectedChars.filter(c => c !== char);
+                } else {
+                    newSelected = [...selectedChars, char];
+                }
+                setSelectedChars(newSelected);
+
+                const isWin = target.every(t => newSelected.includes(t)) && newSelected.length === target.length;
+                if (isWin) {
+                    setTimeout(onSolve, 2000);
+                }
+            };
+
+            return (
+                <div className="flex flex-col items-center justify-center space-y-8 fade-in w-full max-w-lg mx-auto px-4">
+                    <div className="text-center space-y-4">
+                        <p className="text-lg leading-relaxed text-stone-300">
+                            抵達安全屋後，收到了一封看似普通的信件。<br/>
+                            但信封內側寫著提示：<span className="text-amber-200">「取每一行的首字」</span>。
+                        </p>
+                    </div>
+
+                    <div className="paper-texture p-8 rounded-lg vintage-shadow w-full text-center space-y-6">
+                        {lines.map((line, lineIdx) => (
+                            <div key={lineIdx} className="text-xl md:text-2xl tracking-[0.5em] font-medium">
+                                {line.split('').map((char, charIdx) => (
+                                    <span 
+                                        key={charIdx}
+                                        onClick={() => handleCharClick(char)}
+                                        className={`cursor-pointer transition-colors duration-300 ${
+                                            selectedChars.includes(char) ? 'text-red-700 font-bold' : 'hover:text-amber-600'
+                                        }`}
+                                    >
+                                        {char}
+                                    </span>
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+                    {target.every(t => selectedChars.includes(t)) && selectedChars.length === target.length && (
+                        <p className="text-green-400/80 tracking-widest animate-pulse">成功解讀暗號：願平安。</p>
+                    )}
+                </div>
+            );
+        };
+
+        // 小遊戲 6：照片顯影
+        const PhotoGame = ({ onSolve }) => {
+            const [focus, setFocus] = useState(10);
+            const [exposure, setExposure] = useState(90);
+            const [isSolved, setIsSolved] = useState(false);
+
+            const targetFocus = 50;
+            const targetExposure = 40;
+
+            const blurAmount = Math.abs(focus - targetFocus) / 5;
+            const brightnessAmount = exposure / 100 * 2 + 0.2; // 0.2 to 2.2
+
+            useEffect(() => {
+                if (Math.abs(focus - targetFocus) < 5 && Math.abs(exposure - targetExposure) < 5 && !isSolved) {
+                    setIsSolved(true);
+                    setTimeout(onSolve, 4000);
+                }
+            }, [focus, exposure, isSolved, onSolve]);
+
+            return (
+                <div className="flex flex-col items-center justify-center space-y-8 fade-in w-full max-w-2xl mx-auto px-4">
+                    <div className="text-center space-y-4">
+                        <p className="text-lg leading-relaxed text-stone-300">
+                            木盒的最底層，有一間暗房的用具和一張未顯影的相紙。<br/>
+                            我們需要調整<span className="text-amber-200">「焦距」</span>與<span className="text-amber-200">「曝光」</span>，讓歷史的畫面重現。
+                        </p>
+                    </div>
+
+                    <div className="bg-stone-800 p-8 rounded-xl vintage-shadow border-2 border-stone-700 w-full flex flex-col md:flex-row gap-8 items-center">
+                        {/* 影像區 */}
+                        <div className="w-64 h-48 bg-stone-900 border-4 border-stone-200 p-2 shadow-lg relative overflow-hidden flex-shrink-0">
+                            <div 
+                                className="w-full h-full bg-stone-300 transition-all duration-300 flex items-center justify-center"
+                                style={{
+                                    filter: `blur(${blurAmount}px) brightness(${brightnessAmount})`,
+                                }}
+                            >
+                                {/* 使用 SVG 簡單繪製群眾聚集的意象 */}
+                                <svg viewBox="0 0 100 100" className="w-full h-full opacity-60">
+                                    <rect x="0" y="50" width="100" height="50" fill="#4a4036" />
+                                    <circle cx="20" cy="45" r="5" fill="#2d2620" />
+                                    <rect x="18" y="50" width="4" height="20" fill="#2d2620" />
+                                    <circle cx="50" cy="40" r="6" fill="#2d2620" />
+                                    <rect x="47" y="46" width="6" height="25" fill="#2d2620" />
+                                    <circle cx="80" cy="48" r="4" fill="#2d2620" />
+                                    <rect x="78" y="52" width="4" height="15" fill="#2d2620" />
+                                    <path d="M 0 50 L 100 50 L 100 100 L 0 100 Z" fill="url(#grad)" />
+                                    <defs>
+                                        <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="transparent"/>
+                                            <stop offset="100%" stopColor="#1a1814"/>
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
+                            </div>
+                        </div>
+
+                        {/* 控制區 */}
+                        <div className="flex-grow w-full space-y-6">
+                            <div>
+                                <label className="flex justify-between text-stone-400 mb-2 font-mono">
+                                    <span>焦距 (Focus)</span>
+                                </label>
+                                <input 
+                                    type="range" min="0" max="100" value={focus}
+                                    onChange={(e) => setFocus(e.target.value)}
+                                    className="w-full h-2 bg-stone-900 rounded-lg appearance-none cursor-pointer outline-none"
+                                    disabled={isSolved}
+                                />
+                            </div>
+                            <div>
+                                <label className="flex justify-between text-stone-400 mb-2 font-mono">
+                                    <span>曝光 (Exposure)</span>
+                                </label>
+                                <input 
+                                    type="range" min="0" max="100" value={exposure}
+                                    onChange={(e) => setExposure(e.target.value)}
+                                    className="w-full h-2 bg-stone-900 rounded-lg appearance-none cursor-pointer outline-none"
+                                    disabled={isSolved}
+                                />
+                            </div>
+                            {isSolved && <p className="text-green-400 text-sm animate-pulse">影像已清晰重現：是當時人們和平集會的身影。</p>}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 小遊戲 7：秘密夾層
+        const HideGame = ({ onSolve }) => {
+            const items = [
+                { id: 1, name: "查禁書刊", isEvidence: true },
+                { id: 2, name: "日常懷錶", isEvidence: false },
+                { id: 3, name: "現場紀實底片", isEvidence: true },
+                { id: 4, name: "糧食配給證", isEvidence: false },
+                { id: 5, name: "陳情書草稿", isEvidence: true }
+            ];
+            const [selectedIds, setSelectedIds] = useState([]);
+            const [error, setError] = useState(false);
+
+            const toggleItem = (id) => {
+                setError(false);
+                if (selectedIds.includes(id)) {
+                    setSelectedIds(selectedIds.filter(i => i !== id));
+                } else {
+                    setSelectedIds([...selectedIds, id]);
+                }
+            };
+
+            const checkHiddenItems = () => {
+                const targetIds = items.filter(i => i.isEvidence).map(i => i.id);
+                const isCorrect = selectedIds.length === targetIds.length && 
+                                  selectedIds.every(id => targetIds.includes(id));
+                
+                if (isCorrect) {
+                    setTimeout(onSolve, 1500);
+                } else {
+                    setError(true);
+                }
+            };
+
+            return (
+                <div className="flex flex-col items-center justify-center space-y-8 fade-in w-full max-w-2xl mx-auto px-4">
+                    <div className="text-center space-y-4">
+                        <p className="text-lg leading-relaxed text-stone-300">
+                            風聲越來越緊，聽說外面開始了嚴格的搜查。<br/>
+                            我們必須把<span className="text-amber-200">「能證明歷史真相的物品」</span>藏進木盒的秘密夾層，<br/>
+                            把普通的物品留在外面以掩人耳目。
+                        </p>
+                    </div>
+
+                    <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="bg-stone-800 p-6 rounded-lg border border-stone-700">
+                            <h3 className="text-stone-400 mb-4 border-b border-stone-600 pb-2">桌上的物品</h3>
+                            <div className="space-y-2">
+                                {items.map(item => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => toggleItem(item.id)}
+                                        className={`w-full text-left p-3 rounded transition-colors ${
+                                            selectedIds.includes(item.id) 
+                                                ? 'bg-stone-900 text-stone-600 line-through' 
+                                                : 'bg-stone-700 text-stone-200 hover:bg-stone-600'
+                                        }`}
+                                    >
+                                        {item.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-stone-900 p-6 rounded-lg border-2 border-dashed border-stone-600 flex flex-col">
+                            <h3 className="text-amber-200/80 mb-4 border-b border-stone-700 pb-2">秘密夾層</h3>
+                            <div className="flex-grow space-y-2 mb-6">
+                                {selectedIds.length === 0 && <p className="text-stone-600 italic">空無一物...</p>}
+                                {selectedIds.map(id => (
+                                    <div key={id} className="p-2 bg-stone-800 text-amber-100 rounded text-sm">
+                                        {items.find(i => i.id === id).name}
+                                    </div>
+                                ))}
+                            </div>
+                            <button 
+                                onClick={checkHiddenItems}
+                                className="w-full py-3 bg-amber-900/50 hover:bg-amber-800 text-amber-100 rounded transition-colors border border-amber-700"
+                            >
+                                關閉夾層並上鎖
+                            </button>
+                            {error && <p className="text-red-400 text-sm mt-2 text-center">有些重要的證據沒藏好，或是不需要藏的物品引起了懷疑...</p>}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 主應用程式
+        const App = () => {
+            const [scene, setScene] = useState(0);
+
+            const nextScene = () => setScene(prev => prev + 1);
+
+            return (
+                <div className="min-h-screen flex flex-col items-center justify-center p-6 relative">
+                    {/* 裝飾性邊框 */}
+                    <div className="absolute inset-4 border border-stone-800 pointer-events-none"></div>
+                    <div className="absolute inset-5 border border-stone-800 pointer-events-none"></div>
+
+                    {scene === 0 && (
+                        <div className="text-center space-y-12 fade-in max-w-2xl">
+                            <h1 className="text-5xl md:text-6xl tracking-[0.2em] font-bold text-amber-100/90 mb-4" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.8)' }}>
+                                1947
+                            </h1>
+                            <h2 className="text-2xl md:text-3xl tracking-widest text-stone-400">記憶的微光</h2>
+                            
+                            <div className="h-px bg-gradient-to-r from-transparent via-stone-500 to-transparent my-8 w-3/4 mx-auto"></div>
+                            
+                            <p className="text-stone-300 leading-loose text-lg md:text-xl text-left">
+                                歷史不該只是一串冰冷的數字。<br/><br/>
+                                那些在時代洪流中被迫噤聲的日常，隱藏在抽屜深處、泛黃的紙頁間。<br/>
+                                打開祖父遺留的舊木盒，讓我們一起拼湊出那段不該被遺忘的春日記憶。
+                            </p>
+
+                            <button 
+                                onClick={nextScene}
+                                className="mt-12 px-8 py-3 border-2 border-stone-500 text-stone-300 hover:bg-stone-800 hover:text-amber-100 transition-all tracking-widest rounded"
+                            >
+                                打開木盒
+                            </button>
+                        </div>
+                    )}
+
+                    {scene === 1 && <LockGame onSolve={nextScene} />}
+                    {scene === 2 && <RadioGame onSolve={nextScene} />}
+                    {scene === 3 && <DocumentGame onSolve={nextScene} />}
+                    {scene === 4 && <MapGame onSolve={nextScene} />}
+                    {scene === 5 && <CipherGame onSolve={nextScene} />}
+                    {scene === 6 && <PhotoGame onSolve={nextScene} />}
+                    {scene === 7 && <HideGame onSolve={nextScene} />}
+                    
+                    {scene === 8 && (
+                        <div className="text-center space-y-8 fade-in max-w-2xl paper-texture p-12 rounded-lg vintage-shadow">
+                            <h2 className="text-3xl tracking-widest text-stone-800 font-bold mb-6">尾聲</h2>
+                            <p className="text-stone-700 leading-loose text-lg text-left">
+                                看著桌上拼湊完整的日記與發出微微嗡鳴的收音機，我彷彿看見了祖父年輕時的臉龐。
+                            </p>
+                            <p className="text-stone-700 leading-loose text-lg text-left">
+                                那些在恐懼中被撕毀的真相、那些在雜訊中試圖傳遞的希望，如今終於跨越了七十多年的時光，被我所接收。
+                            </p>
+                            <p className="text-stone-700 leading-loose text-lg text-left">
+                                祖父當年小心翼翼藏在夾層裡的，不只是歷史的碎片，更是對未來的期盼。
+                            </p>
+                            <p className="text-stone-800 font-bold leading-loose text-xl mt-8">
+                                記住黑暗，是為了讓微光得以延續。<br/>
+                                願台灣，永遠享有免於恐懼的自由。
+                            </p>
+                            <div className="mt-12 pt-8 border-t border-stone-400/30">
+                                <button 
+                                    onClick={() => setScene(0)}
+                                    className="px-6 py-2 border border-stone-500 text-stone-600 hover:bg-stone-800 hover:text-amber-100 transition-all tracking-widest rounded text-sm"
+                                >
+                                    重置遊戲
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
